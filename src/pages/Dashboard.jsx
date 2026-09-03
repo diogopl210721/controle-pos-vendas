@@ -3,14 +3,17 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Clock, XCircle, TrendingDown, AlertTriangle } from "lucide-react";
 import ContratosTable from "../components/ContratosTable";
 
-function KPICard({ icon: Icon, value, label, hint, tone }) {
+function KPICard({ icon: Icon, value, label, hint, tone, onClick }) {
   const tones = {
     amber: "text-amber-400 bg-amber-500/10 border-amber-500/20",
     rose: "text-rose-400 bg-rose-500/10 border-rose-500/20",
     teal: "text-teal-400 bg-teal-500/10 border-teal-500/20",
   };
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 flex flex-col gap-3">
+    <button
+      onClick={onClick}
+      className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-4 sm:p-5 flex flex-col gap-3 text-left transition-colors"
+    >
       <div className={`w-10 h-10 rounded-lg border flex items-center justify-center ${tones[tone]}`}>
         <Icon size={18} />
       </div>
@@ -19,11 +22,11 @@ function KPICard({ icon: Icon, value, label, hint, tone }) {
         <div className="text-sm text-slate-400 mt-0.5">{label}</div>
       </div>
       {hint && <div className="text-xs text-slate-500 pt-1 border-t border-slate-800 hidden sm:block">{hint}</div>}
-    </div>
+    </button>
   );
 }
 
-export default function Dashboard({ contratos, onSelect }) {
+export default function Dashboard({ contratos, onSelect, onNavigateFiltro }) {
   const stats = useMemo(() => {
     const vencidos = contratos.filter((c) => c.dias < 0).length;
     const d30 = contratos.filter((c) => c.dias >= 0 && c.dias <= 30).length;
@@ -64,20 +67,23 @@ export default function Dashboard({ contratos, onSelect }) {
       </div>
 
       {stats.d180 > 0 && stats.pendenteConsultorUrgente > 0 && (
-        <div className="flex items-center gap-3 bg-amber-500/[0.06] border border-amber-500/20 rounded-xl px-4 sm:px-5 py-3">
+        <button
+          onClick={() => onNavigateFiltro("180")}
+          className="flex items-center gap-3 bg-amber-500/[0.06] hover:bg-amber-500/[0.1] border border-amber-500/20 rounded-xl px-4 sm:px-5 py-3 text-left transition-colors"
+        >
           <AlertTriangle size={17} className="text-amber-400 shrink-0" />
           <p className="text-sm text-amber-200">
             <strong className="font-semibold">{stats.pendenteConsultorUrgente} de {stats.d180}</strong> clientes que vencem
             nos próximos 180 dias estão com <strong className="font-semibold">consultor pendente</strong>.
           </p>
-        </div>
+        </button>
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <KPICard icon={Clock} tone="amber" value={stats.d150} label="Em 150 dias" hint="Iniciar abordagem" />
-        <KPICard icon={Clock} tone="amber" value={stats.d95} label="Em 95 dias" hint="Abordagem ativa" />
-        <KPICard icon={TrendingDown} tone="teal" value={stats.d180} label="Próx. 180 dias" hint="Janela de planejamento" />
-        <KPICard icon={XCircle} tone="rose" value={stats.vencidos} label="Vencidos" hint="Ação imediata" />
+        <KPICard icon={Clock} tone="amber" value={stats.d150} label="Em 150 dias" hint="Iniciar abordagem" onClick={() => onNavigateFiltro("150")} />
+        <KPICard icon={Clock} tone="amber" value={stats.d95} label="Em 95 dias" hint="Abordagem ativa" onClick={() => onNavigateFiltro("95")} />
+        <KPICard icon={TrendingDown} tone="teal" value={stats.d180} label="Próx. 180 dias" hint="Janela de planejamento" onClick={() => onNavigateFiltro("180")} />
+        <KPICard icon={XCircle} tone="rose" value={stats.vencidos} label="Vencidos" hint="Ação imediata" onClick={() => onNavigateFiltro("vencidos")} />
       </div>
 
       <ContratosTable contratos={contratos} onSelect={onSelect} porPagina={10} />

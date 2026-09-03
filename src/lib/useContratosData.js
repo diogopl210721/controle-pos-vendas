@@ -33,8 +33,8 @@ export function useContratosData() {
       .from("cpv_contratos")
       .select(`
         id, numero_contrato, data_inicio, data_termino, prazo_meses, canal_venda,
-        cliente:cpv_clientes ( codigo_cliente, nome, bairro, cidade, uf ),
-        consultor:cpv_consultores ( nome )
+        cliente:cpv_clientes ( id, codigo_cliente, nome, bairro, cidade, uf, documento, endereco, telefone, whatsapp ),
+        consultor:cpv_consultores ( id, nome )
       `)
       .order("data_termino", { ascending: true })
       .limit(5000);
@@ -47,16 +47,22 @@ export function useContratosData() {
 
     const linhas = (data || []).map((c) => ({
       id: c.id,
+      clienteId: c.cliente?.id ?? null,
       codigo: c.cliente?.codigo_cliente ?? "-",
       nome: c.cliente?.nome ?? "Cliente sem nome",
       bairro: c.cliente?.bairro ?? "",
       cidade: c.cliente?.cidade ?? "",
       uf: c.cliente?.uf ?? "",
+      documento: c.cliente?.documento ?? "",
+      endereco: c.cliente?.endereco ?? "",
+      telefone: c.cliente?.telefone ?? "",
+      whatsapp: c.cliente?.whatsapp ?? "",
       contrato: c.numero_contrato,
       inicio: c.data_inicio,
       venc: c.data_termino,
       prazo: c.prazo_meses,
       canal: c.canal_venda,
+      consultorId: c.consultor?.id ?? null,
       consultor: c.consultor?.nome ?? "Pendente consultor",
       dias: diasParaVencer(c.data_termino),
     }));

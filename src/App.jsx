@@ -16,12 +16,18 @@ export default function App() {
   const [view, setView] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selecionado, setSelecionado] = useState(null);
+  const [filtroCentral, setFiltroCentral] = useState("todos");
 
   const alertasUrgentes = contratos.filter((c) => c.dias >= 0 && c.dias <= 30).length;
 
   function navegar(v) {
     setView(v);
     setSidebarOpen(false);
+  }
+
+  function navegarComFiltro(filtro) {
+    setFiltroCentral(filtro);
+    navegar("central");
   }
 
   if (loading) {
@@ -70,8 +76,8 @@ export default function App() {
         </div>
 
         <div className="px-4 sm:px-8 pb-10">
-          {view === "dashboard" && <Dashboard contratos={contratos} onSelect={setSelecionado} />}
-          {view === "central" && <CentralRenovacoes contratos={contratos} onSelect={setSelecionado} />}
+          {view === "dashboard" && <Dashboard contratos={contratos} onSelect={setSelecionado} onNavigateFiltro={navegarComFiltro} />}
+          {view === "central" && <CentralRenovacoes contratos={contratos} onSelect={setSelecionado} filtroInicial={filtroCentral} />}
           {view === "contratos" && <Contratos contratos={contratos} onSelect={setSelecionado} />}
           {view === "clientes" && <Clientes contratos={contratos} onSelect={setSelecionado} />}
           {view === "consultores" && <Consultores contratos={contratos} consultores={consultores} />}
@@ -80,7 +86,7 @@ export default function App() {
         </div>
       </main>
 
-      <ClienteDrawer cliente={selecionado} onClose={() => setSelecionado(null)} />
+      <ClienteDrawer cliente={selecionado} onClose={() => setSelecionado(null)} onAtualizado={refetch} />
     </div>
   );
 }

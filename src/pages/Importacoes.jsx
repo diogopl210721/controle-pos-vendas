@@ -81,20 +81,43 @@ export default function Importacoes({ onImportado }) {
       }
 
       // 2) clientes (um por código, pegando o registro com vencimento mais recente)
-      setProgresso("Enviando clientes...");
+      setProgresso("Comparando com o que já existe no banco...");
       const clientesPorCodigo = {};
       registros.forEach((r) => {
         const atual = clientesPorCodigo[r.codigo_cliente];
         if (!atual || r.data_termino > atual.data_termino) clientesPorCodigo[r.codigo_cliente] = r;
       });
-      const clientesRows = Object.values(clientesPorCodigo).map((r) => ({
-        codigo_cliente: r.codigo_cliente,
-        nome: r.nome_cliente,
-        bairro: r.bairro || null,
-        cidade: r.cidade || null,
-        uf: r.uf || null,
-        consultor_id: mapaConsultor[r.consultor_nome] || null,
-      }));
+      const codigosDoImport = Object.keys(clientesPorCodigo);
+
+      // busca o que já existe, pra nunca sobrescrever com vazio nem apagar dado que só foi
+      // preenchido manualmente (telefone, whatsapp, endereço, documento — esses nem entram aqui)
+      const existentesPorCodigo = {};
+      for (const lote of chunk(codigosDoImport, 300)) {
+        const { data, error } = await supabase
+          .from("cpv_clientes")
+          .select("codigo_cliente, nome, bairro, cidade, uf")
+          .in("codigo_cliente", lote);
+        if (error) throw error;
+        (data || []).forEach((c) => (existentesPorCodigo[c.codigo_cliente] = c));
+      }
+
+      let clientesNovos = 0;
+      let clientesAtualizados = 0;
+      setProgresso("Enviando clientes...");
+      const clientesRows = Object.values(clientesPorCodigo).map((r) => {
+        const existente = existentesPorCodigo[r.codigo_cliente];
+        if (existente) clientesAtualizados++; else clientesNovos++;
+        return {
+          codigo_cliente: r.codigo_cliente,
+          // só troca o que já existia se a planilha realmente trouxe um valor novo;
+          // campo vazio na planilha nunca apaga o que já estava cadastrado
+          nome: r.nome_cliente || existente?.nome || r.nome_cliente,
+          bairro: r.bairro || existente?.bairro || null,
+          cidade: r.cidade || existente?.cidade || null,
+          uf: r.uf || existente?.uf || null,
+          consultor_id: mapaConsultor[r.consultor_nome] || null,
+        };
+      });
       for (const lote of chunk(clientesRows, 300)) {
         const { error } = await supabase.from("cpv_clientes").upsert(lote, { onConflict: "codigo_cliente" });
         if (error) throw error;
@@ -145,6 +168,8 @@ export default function Importacoes({ onImportado }) {
 
       setResultado({
         clientes: clientesRows.length,
+        clientesNovos,
+        clientesAtualizados,
         contratos: contratosRows.length,
         novosConsultores: novosConsultores.length,
         erros: erros.length,
@@ -290,7 +315,8 @@ export default function Importacoes({ onImportado }) {
             <CheckCircle2 size={16} /> Importação concluída
           </div>
           <p className="text-sm text-slate-300">
-            {resultado.clientes} clientes e {resultado.contratos} contratos atualizados no banco
+            {resultado.clientesNovos} clientes novos e {resultado.clientesAtualizados} já existentes (sem apagar
+            telefone, endereço ou tancagem já cadastrados) · {resultado.contratos} contratos no total
             {resultado.novosConsultores > 0 && <> · {resultado.novosConsultores} consultores novos cadastrados</>}
             {resultado.erros > 0 && <> · {resultado.erros} linhas ignoradas por falta de dado obrigatório</>}.
           </p>

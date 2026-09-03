@@ -9,6 +9,7 @@ const PRAZO_OPTS = [
   { key: "60", label: "60 dias" },
   { key: "95", label: "95 dias" },
   { key: "150", label: "150 dias" },
+  { key: "180", label: "180 dias" },
 ];
 
 export default function ContratosTable({
