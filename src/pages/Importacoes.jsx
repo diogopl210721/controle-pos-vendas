@@ -12,6 +12,22 @@ function chunk(arr, size) {
   return out;
 }
 
+function normalizarNome(str) {
+  return String(str || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, "")
+    .trim();
+}
+
+function nomesBatem(a, b) {
+  const na = normalizarNome(a);
+  const nb = normalizarNome(b);
+  if (!na || !nb) return true; // um dos dois vazio: não é motivo pra travar
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
 export default function Importacoes({ onImportado }) {
   const [arquivo, setArquivo] = useState(null);
   const [etapa, setEtapa] = useState("upload"); // upload | mapeando | preview | importando | feito | erro
@@ -103,20 +119,41 @@ export default function Importacoes({ onImportado }) {
 
       let clientesNovos = 0;
       let clientesAtualizados = 0;
+      const divergencias = [];
       setProgresso("Enviando clientes...");
       const clientesRows = Object.values(clientesPorCodigo).map((r) => {
         const existente = existentesPorCodigo[r.codigo_cliente];
-        if (existente) clientesAtualizados++; else clientesNovos++;
+        if (!existente) {
+          clientesNovos++;
+          return {
+            codigo_cliente: r.codigo_cliente,
+            nome: r.nome_cliente,
+            bairro: r.bairro || null,
+            cidade: r.cidade || null,
+            uf: r.uf || null,
+            consultor_id: mapaConsultor[r.consultor_nome] || null,
+          };
+        }
+        // código já existe: só confirma a atualização se o nome bate (código + nome = mesma empresa)
+        const confirmado = nomesBatem(existente.nome, r.nome_cliente);
+        if (!confirmado) {
+          divergencias.push({ codigo: r.codigo_cliente, nomeAntigo: existente.nome, nomeNovo: r.nome_cliente });
+        } else {
+          clientesAtualizados++;
+        }
         return {
           codigo_cliente: r.codigo_cliente,
-          // só troca o que já existia se a planilha realmente trouxe um valor novo;
-          // campo vazio na planilha nunca apaga o que já estava cadastrado
-          nome: r.nome_cliente || existente?.nome || r.nome_cliente,
-          bairro: r.bairro || existente?.bairro || null,
-          cidade: r.cidade || existente?.cidade || null,
-          uf: r.uf || existente?.uf || null,
-          consultor_id: mapaConsultor[r.consultor_nome] || null,
+          // nome só troca se o código+nome bateram; se deu divergência, mantém o que já tinha até você revisar
+          nome: confirmado ? (r.nome_cliente || existente.nome) : existente.nome,
+          bairro: confirmado ? (r.bairro || existente.bairro || null) : existente.bairro,
+          cidade: confirmado ? (r.cidade || existente.cidade || null) : existente.cidade,
+          uf: confirmado ? (r.uf || existente.uf || null) : existente.uf,
+          consultor_id: confirmado ? (mapaConsultor[r.consultor_nome] || null) : undefined,
         };
+      }).map((row) => {
+        // remove consultor_id undefined pra não sobrescrever com null sem querer nas divergências
+        if (row.consultor_id === undefined) delete row.consultor_id;
+        return row;
       });
       for (const lote of chunk(clientesRows, 300)) {
         const { error } = await supabase.from("cpv_clientes").upsert(lote, { onConflict: "codigo_cliente" });
@@ -170,6 +207,7 @@ export default function Importacoes({ onImportado }) {
         clientes: clientesRows.length,
         clientesNovos,
         clientesAtualizados,
+        divergencias,
         contratos: contratosRows.length,
         novosConsultores: novosConsultores.length,
         erros: erros.length,
@@ -315,11 +353,28 @@ export default function Importacoes({ onImportado }) {
             <CheckCircle2 size={16} /> Importação concluída
           </div>
           <p className="text-sm text-slate-300">
-            {resultado.clientesNovos} clientes novos e {resultado.clientesAtualizados} já existentes (sem apagar
-            telefone, endereço ou tancagem já cadastrados) · {resultado.contratos} contratos no total
+            {resultado.clientesNovos} clientes novos e {resultado.clientesAtualizados} já existentes (código + nome
+            confirmados, sem apagar telefone, endereço ou tancagem já cadastrados) · {resultado.contratos} contratos
+            no total
             {resultado.novosConsultores > 0 && <> · {resultado.novosConsultores} consultores novos cadastrados</>}
             {resultado.erros > 0 && <> · {resultado.erros} linhas ignoradas por falta de dado obrigatório</>}.
           </p>
+          {resultado.divergencias?.length > 0 && (
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+              <p className="text-xs text-amber-300 font-medium mb-2">
+                {resultado.divergencias.length} código(s) com nome diferente do cadastrado — não atualizei esses,
+                revise manualmente:
+              </p>
+              <div className="flex flex-col gap-1">
+                {resultado.divergencias.slice(0, 8).map((d, i) => (
+                  <div key={i} className="text-xs text-amber-200/80">
+                    Código {d.codigo}: <span className="text-slate-400">"{d.nomeAntigo}"</span> na base vs{" "}
+                    <span className="text-slate-400">"{d.nomeNovo}"</span> na planilha
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <button onClick={reiniciar} className="self-start text-sm text-amber-400 hover:text-amber-300">
             Importar outra planilha
           </button>

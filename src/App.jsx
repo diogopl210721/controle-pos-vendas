@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Menu, Upload, Bell, Loader2 } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import { Menu, Upload, Bell, Loader2, ArrowLeft } from "lucide-react";
 import { useContratosData } from "./lib/useContratosData";
 import Sidebar from "./components/Sidebar";
 import ClienteDrawer from "./components/ClienteDrawer";
@@ -11,23 +11,44 @@ import Consultores from "./pages/Consultores";
 import Importacoes from "./pages/Importacoes";
 import Configuracoes from "./pages/Configuracoes";
 
+const VIEWS_VALIDAS = ["dashboard", "central", "contratos", "clientes", "consultores", "importacoes", "config"];
+
+function viewFromHash() {
+  const h = window.location.hash.replace("#", "");
+  return VIEWS_VALIDAS.includes(h) ? h : "dashboard";
+}
+
 export default function App() {
   const { loading, erro, contratos, consultores, refetch } = useContratosData();
-  const [view, setView] = useState("dashboard");
+  const [view, setView] = useState(viewFromHash());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selecionado, setSelecionado] = useState(null);
   const [filtroCentral, setFiltroCentral] = useState("todos");
 
   const alertasUrgentes = contratos.filter((c) => c.dias >= 0 && c.dias <= 30).length;
 
-  function navegar(v) {
+  useEffect(() => {
+    if (!window.location.hash) window.history.replaceState(null, "", "#dashboard");
+    const onPop = () => setView(viewFromHash());
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  const navegar = useCallback((v) => {
     setView(v);
     setSidebarOpen(false);
-  }
+    if (window.location.hash.replace("#", "") !== v) {
+      window.history.pushState(null, "", "#" + v);
+    }
+  }, []);
 
   function navegarComFiltro(filtro) {
     setFiltroCentral(filtro);
     navegar("central");
+  }
+
+  function voltar() {
+    window.history.back();
   }
 
   if (loading) {
@@ -53,10 +74,19 @@ export default function App() {
 
       <main className="flex-1 min-w-0">
         <div className="flex items-center justify-between px-4 sm:px-8 pt-6 sm:pt-8 pb-4 sm:pb-6">
-          <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-300 -ml-1 p-1">
-            <Menu size={22} />
-          </button>
-          <div className="hidden lg:block" />
+          <div className="flex items-center gap-3">
+            <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-300 -ml-1 p-1">
+              <Menu size={22} />
+            </button>
+            {view !== "dashboard" && (
+              <button
+                onClick={voltar}
+                className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200 px-2 py-1 -ml-1"
+              >
+                <ArrowLeft size={17} /> <span className="hidden sm:inline">Voltar</span>
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => navegar("importacoes")}
