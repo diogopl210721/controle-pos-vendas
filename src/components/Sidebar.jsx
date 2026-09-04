@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  Flame, X, LayoutGrid, ListChecks, FileText, Users, Fuel, Upload, Settings,
+  Flame, X, LayoutGrid, ListChecks, FileText, Users, Upload,
 } from "lucide-react";
 
 const ITEMS = [
@@ -10,7 +10,6 @@ const ITEMS = [
   { key: "clientes", label: "Clientes", icon: Users },
   { key: "consultores", label: "Consultores", icon: Users },
   { key: "importacoes", label: "Importações", icon: Upload },
-  { key: "config", label: "Configurações", icon: Settings },
 ];
 
 function NavItem({ icon: Icon, label, active, onClick }) {
@@ -64,23 +63,6 @@ export default function Sidebar({ view, onNavigate, open, onClose }) {
             />
           ))}
         </nav>
-
-        <div className="mt-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="flex items-center gap-2 text-amber-300 text-xs font-medium mb-1">
-              <Upload size={14} /> Importação
-            </div>
-            <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-              Suba a planilha atualizada e o sistema recalcula tudo.
-            </p>
-            <button
-              onClick={() => onNavigate("importacoes")}
-              className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-medium py-2 rounded-lg transition-colors"
-            >
-              Importar planilha
-            </button>
-          </div>
-        </div>
       </aside>
     </>
   );
