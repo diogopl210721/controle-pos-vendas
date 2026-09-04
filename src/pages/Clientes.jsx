@@ -1,9 +1,13 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Search } from "lucide-react";
 import { formatDate, prioridade } from "../lib/format";
+import PaginacaoControles from "../components/PaginacaoControles";
+
+const POR_PAGINA = 30;
 
 export default function Clientes({ contratos, onSelect }) {
   const [busca, setBusca] = useState("");
+  const [pagina, setPagina] = useState(1);
 
   const porCliente = useMemo(() => {
     const maisProximo = {};
@@ -22,6 +26,10 @@ export default function Clientes({ contratos, onSelect }) {
     const q = busca.toLowerCase();
     return porCliente.filter((c) => c.nome.toLowerCase().includes(q) || c.codigo.includes(q) || c.cidade.toLowerCase().includes(q));
   }, [porCliente, busca]);
+
+  useEffect(() => setPagina(1), [busca]);
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
+  const pageItems = filtrados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
 
   return (
     <div className="flex flex-col gap-6">
@@ -54,7 +62,7 @@ export default function Clientes({ contratos, onSelect }) {
             </tr>
           </thead>
           <tbody>
-            {filtrados.slice(0, 200).map((c) => (
+            {pageItems.map((c) => (
               <tr key={c.codigo} onClick={() => onSelect(c)} className="border-b border-slate-800/60 hover:bg-slate-800/30 cursor-pointer">
                 <td className="py-2.5 px-4 text-slate-400 tabular-nums">{c.codigo}</td>
                 <td className="py-2.5 px-3 text-slate-100 max-w-[220px] truncate">{c.nome}</td>
@@ -68,9 +76,15 @@ export default function Clientes({ contratos, onSelect }) {
             ))}
           </tbody>
         </table>
-        {filtrados.length > 200 && (
-          <div className="text-center text-xs text-slate-500 py-3">Mostrando os 200 primeiros — refine a busca para ver outros</div>
+        {filtrados.length === 0 && (
+          <div className="text-center text-sm text-slate-500 py-10">Nenhum cliente encontrado.</div>
         )}
+        <PaginacaoControles
+          pagina={pagina}
+          totalPaginas={totalPaginas}
+          onAnterior={() => setPagina((p) => Math.max(1, p - 1))}
+          onProxima={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+        />
       </div>
     </div>
   );

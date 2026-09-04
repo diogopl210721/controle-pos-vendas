@@ -29,23 +29,31 @@ export function useContratosData() {
     }
     setConsultores(consData || []);
 
-    const { data, error } = await supabase
-      .from("cpv_contratos")
-      .select(`
-        id, numero_contrato, data_inicio, data_termino, prazo_meses, canal_venda,
-        cliente:cpv_clientes ( id, codigo_cliente, nome, bairro, cidade, uf, documento, endereco, telefone, whatsapp ),
-        consultor:cpv_consultores ( id, nome )
-      `)
-      .order("data_termino", { ascending: true })
-      .limit(5000);
+    let todasAsLinhas = [];
+    let de = 0;
+    const tamanhoPagina = 1000;
+    while (true) {
+      const { data, error } = await supabase
+        .from("cpv_contratos")
+        .select(`
+          id, numero_contrato, data_inicio, data_termino, prazo_meses, canal_venda,
+          cliente:cpv_clientes ( id, codigo_cliente, nome, bairro, cidade, uf, documento, endereco, telefone, whatsapp ),
+          consultor:cpv_consultores ( id, nome )
+        `)
+        .order("data_termino", { ascending: true })
+        .range(de, de + tamanhoPagina - 1);
 
-    if (error) {
-      setErro(error.message);
-      setLoading(false);
-      return;
+      if (error) {
+        setErro(error.message);
+        setLoading(false);
+        return;
+      }
+      todasAsLinhas = todasAsLinhas.concat(data || []);
+      if (!data || data.length < tamanhoPagina) break;
+      de += tamanhoPagina;
     }
 
-    const linhas = (data || []).map((c) => ({
+    const linhas = todasAsLinhas.map((c) => ({
       id: c.id,
       clienteId: c.cliente?.id ?? null,
       codigo: c.cliente?.codigo_cliente ?? "-",

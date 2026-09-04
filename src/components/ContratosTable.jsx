@@ -15,7 +15,7 @@ const PRAZO_OPTS = [
 export default function ContratosTable({
   contratos,
   onSelect,
-  porPagina = 20,
+  porPagina = 30,
   titulo = "Clientes que precisam de ação",
   filtroInicial = "todos",
   mostrarFiltroConsultor = false,

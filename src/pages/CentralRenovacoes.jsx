@@ -12,7 +12,7 @@ export default function CentralRenovacoes({ contratos, onSelect, filtroInicial }
         key={filtroInicial}
         contratos={contratos}
         onSelect={onSelect}
-        porPagina={25}
+        porPagina={30}
         titulo="Clientes"
         mostrarFiltroConsultor
         filtroInicial={filtroInicial || "todos"}
