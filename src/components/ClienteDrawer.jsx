@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { X, MapPin, Navigation, MessageCircle, Flame, Pencil, Save, Loader2, Plus, Trash2, Sparkles, AlertTriangle } from "lucide-react";
-import { prioridade, formatDate } from "../lib/format";
-import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "../supabaseClient";
+import { X, MapPin, Navigation, MessageCircle, Pencil, Save, Loader2, Plus, Trash2 } from "lucide-react";
+import { supabase } from "../supabaseClient";
+import ContratoItem from "./ContratoItem";
 
 function DadoIndisponivel({ label }) {
   return (
@@ -42,7 +42,7 @@ function soDigitos(str) {
 function linkWhatsapp(numero) {
   let d = soDigitos(numero);
   if (!d) return null;
-  if (d.length <= 11) d = "55" + d; // assume BR, adiciona DDI se não tiver
+  if (d.length <= 11) d = "55" + d;
   return `https://wa.me/${d}`;
 }
 
@@ -53,49 +53,6 @@ export default function ClienteDrawer({ cliente, onClose, onAtualizado }) {
   const [tanques, setTanques] = useState([]);
   const [carregandoTanques, setCarregandoTanques] = useState(false);
   const [novoTanque, setNovoTanque] = useState({ tipo: "", quantidade: 1, capacidade_unitaria_kg: "" });
-  const [dossie, setDossie] = useState(null);
-  const [gerandoDossie, setGerandoDossie] = useState(false);
-  const [erroDossie, setErroDossie] = useState(null);
-
-  useEffect(() => {
-    if (!cliente?.clienteId) {
-      setDossie(null);
-      return;
-    }
-    supabase
-      .from("cpv_planos_ia")
-      .select("*")
-      .eq("cliente_id", cliente.clienteId)
-      .order("gerado_em", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => setDossie(data || null));
-    setErroDossie(null);
-  }, [cliente?.clienteId]);
-
-  async function gerarDossie() {
-    if (!cliente?.clienteId) return;
-    setGerandoDossie(true);
-    setErroDossie(null);
-    try {
-      const resp = await fetch(`${SUPABASE_URL}/functions/v1/gerar-dossie`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          apikey: SUPABASE_ANON_KEY,
-          authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({ cliente_id: cliente.clienteId, contrato_id: cliente.id }),
-      });
-      const json = await resp.json();
-      if (!resp.ok || json.error) throw new Error(json.error || "Falha ao gerar o dossiê");
-      setDossie(json.dossie);
-    } catch (err) {
-      setErroDossie(err.message);
-    } finally {
-      setGerandoDossie(false);
-    }
-  }
 
   useEffect(() => {
     if (!cliente) return;
@@ -170,10 +127,12 @@ export default function ClienteDrawer({ cliente, onClose, onAtualizado }) {
     : null;
   const wa = linkWhatsapp(form.whatsapp || form.telefone);
 
+  const contratosOrdenados = [...(cliente.contratos || [])].sort((a, b) => a.dias - b.dias);
+
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full sm:w-[440px] bg-slate-900 border-l border-slate-800 h-full overflow-y-auto p-5 sm:p-6">
+      <div className="relative w-full sm:w-[460px] bg-slate-900 border-l border-slate-800 h-full overflow-y-auto p-5 sm:p-6">
         <div className="flex items-start justify-between mb-1">
           <h2 className="text-lg font-semibold text-slate-50 pr-6">{cliente.nome}</h2>
           <button onClick={onClose} className="text-slate-500 hover:text-slate-300">
@@ -181,20 +140,9 @@ export default function ClienteDrawer({ cliente, onClose, onAtualizado }) {
           </button>
         </div>
         <div className="flex items-center gap-2 mb-6">
-          <span className={`text-[11px] px-2 py-1 rounded-md border ${prioridade(cliente.dias).cls}`}>
-            {prioridade(cliente.dias).label}
-          </span>
           <span className="text-xs text-slate-500">Código {cliente.codigo}</span>
-        </div>
-
-        <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 mb-4">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Contrato</h3>
-          <Dado label="Número do contrato" value={cliente.contrato} />
-          <Dado label="Canal de venda" value={cliente.canal} />
-          <Dado label="Início" value={formatDate(cliente.inicio)} />
-          <Dado label="Vencimento" value={formatDate(cliente.venc)} />
-          <Dado label="Prazo" value={`${cliente.prazo} meses`} />
-          <Dado label="Consultor" value={cliente.consultor} />
+          <span className="text-xs text-slate-600">·</span>
+          <span className="text-xs text-slate-500">{contratosOrdenados.length} contrato(s)</span>
         </div>
 
         <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 mb-4">
@@ -278,12 +226,6 @@ export default function ClienteDrawer({ cliente, onClose, onAtualizado }) {
           </div>
         </div>
 
-        <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 mb-4">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Consumo</h3>
-          <DadoIndisponivel label="Consumo médio mensal" />
-          <DadoIndisponivel label="Histórico 12 meses" />
-        </div>
-
         <div className="mb-4">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Ações rápidas</h3>
           <div className="grid grid-cols-3 gap-2">
@@ -316,115 +258,13 @@ export default function ClienteDrawer({ cliente, onClose, onAtualizado }) {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-amber-500/10 to-transparent border border-amber-500/20 rounded-xl p-4">
-          <div className="flex items-center gap-2 text-amber-300 text-sm font-medium mb-1">
-            <Flame size={15} /> Dossiê de Renovação (IA)
+        <div>
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Contratos</h3>
+          <div className="flex flex-col gap-2">
+            {contratosOrdenados.map((c) => (
+              <ContratoItem key={c.id} contrato={c} onAtualizado={onAtualizado} />
+            ))}
           </div>
-
-          {!dossie && !gerandoDossie && (
-            <>
-              <p className="text-xs text-slate-400 leading-relaxed mb-3">
-                A IA vai analisar os dados disponíveis deste cliente (tancagem e consumo, se houver) e montar o
-                roteiro de visita, perguntas, objeções prováveis e próximo passo.
-              </p>
-              <button
-                onClick={gerarDossie}
-                className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-medium py-2.5 rounded-lg transition-colors"
-              >
-                <Sparkles size={14} /> Preparar visita com IA
-              </button>
-            </>
-          )}
-
-          {gerandoDossie && (
-            <div className="flex items-center gap-2 text-xs text-amber-200 py-3">
-              <Loader2 size={14} className="animate-spin" /> A IA está analisando o cliente...
-            </div>
-          )}
-
-          {erroDossie && (
-            <div className="flex items-start gap-2 text-xs text-rose-300 bg-rose-500/10 border border-rose-500/20 rounded-lg p-3 mt-2">
-              <AlertTriangle size={13} className="shrink-0 mt-0.5" />
-              <span>{erroDossie}</span>
-            </div>
-          )}
-
-          {dossie && !gerandoDossie && (
-            <div className="flex flex-col gap-3 mt-1">
-              <div className="flex items-center justify-between">
-                <span className="text-2xl font-semibold text-slate-50">{dossie.score ?? "—"}<span className="text-sm text-slate-500">/100</span></span>
-                <button onClick={gerarDossie} className="text-[11px] text-amber-400 hover:text-amber-300">Gerar de novo</button>
-              </div>
-              {dossie.resumo_executivo && (
-                <div>
-                  <div className="text-[11px] text-slate-500 uppercase mb-1">Resumo</div>
-                  <p className="text-xs text-slate-300 leading-relaxed">{dossie.resumo_executivo}</p>
-                </div>
-              )}
-              {dossie.analise_consumo && (
-                <div>
-                  <div className="text-[11px] text-slate-500 uppercase mb-1">Consumo</div>
-                  <p className="text-xs text-slate-300 leading-relaxed">{dossie.analise_consumo}</p>
-                </div>
-              )}
-              {dossie.objetivo_visita && (
-                <div>
-                  <div className="text-[11px] text-slate-500 uppercase mb-1">Objetivo da visita</div>
-                  <p className="text-xs text-slate-300 leading-relaxed">{dossie.objetivo_visita}</p>
-                </div>
-              )}
-              {Array.isArray(dossie.roteiro) && dossie.roteiro.length > 0 && (
-                <div>
-                  <div className="text-[11px] text-slate-500 uppercase mb-1">Roteiro</div>
-                  <ol className="text-xs text-slate-300 leading-relaxed list-decimal list-inside flex flex-col gap-1">
-                    {dossie.roteiro.map((p, i) => <li key={i}>{p}</li>)}
-                  </ol>
-                </div>
-              )}
-              {Array.isArray(dossie.perguntas) && dossie.perguntas.length > 0 && (
-                <div>
-                  <div className="text-[11px] text-slate-500 uppercase mb-1">Perguntas sugeridas</div>
-                  <ul className="text-xs text-slate-300 leading-relaxed list-disc list-inside flex flex-col gap-1">
-                    {dossie.perguntas.map((p, i) => <li key={i}>{p}</li>)}
-                  </ul>
-                </div>
-              )}
-              {Array.isArray(dossie.objecoes_previstas) && dossie.objecoes_previstas.length > 0 && (
-                <div>
-                  <div className="text-[11px] text-slate-500 uppercase mb-1">Objeções prováveis</div>
-                  <div className="flex flex-col gap-2">
-                    {dossie.objecoes_previstas.map((o, i) => (
-                      <div key={i} className="bg-slate-950 border border-slate-800 rounded-lg p-2">
-                        <div className="text-xs text-slate-200 font-medium">{o.objecao}</div>
-                        {o.como_investigar && <div className="text-[11px] text-slate-500 mt-1">Investigar: {o.como_investigar}</div>}
-                        {o.como_responder && <div className="text-[11px] text-slate-500">Responder: {o.como_responder}</div>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {Array.isArray(dossie.argumentos_valor) && dossie.argumentos_valor.length > 0 && (
-                <div>
-                  <div className="text-[11px] text-slate-500 uppercase mb-1">Argumentos de valor</div>
-                  <ul className="text-xs text-slate-300 leading-relaxed list-disc list-inside flex flex-col gap-1">
-                    {dossie.argumentos_valor.map((a, i) => <li key={i}>{a}</li>)}
-                  </ul>
-                </div>
-              )}
-              {dossie.decisor?.provavel && (
-                <div>
-                  <div className="text-[11px] text-slate-500 uppercase mb-1">Decisor</div>
-                  <p className="text-xs text-slate-300 leading-relaxed">{dossie.decisor.provavel}</p>
-                </div>
-              )}
-              {dossie.proximo_passo && (
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">
-                  <div className="text-[11px] text-amber-400 uppercase mb-1">Próximo passo</div>
-                  <p className="text-xs text-amber-100 leading-relaxed">{dossie.proximo_passo}</p>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </div>

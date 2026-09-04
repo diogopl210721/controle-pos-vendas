@@ -37,6 +37,7 @@ export function useContratosData() {
         .from("cpv_contratos")
         .select(`
           id, numero_contrato, data_inicio, data_termino, prazo_meses, canal_venda,
+          situacao_gestao, motivo_situacao, transferido_para_codigo, pendente_confirmacao_reativacao,
           cliente:cpv_clientes ( id, codigo_cliente, nome, bairro, cidade, uf, documento, endereco, telefone, whatsapp ),
           consultor:cpv_consultores ( id, nome )
         `)
@@ -73,6 +74,10 @@ export function useContratosData() {
       consultorId: c.consultor?.id ?? null,
       consultor: c.consultor?.nome ?? "Pendente consultor",
       dias: diasParaVencer(c.data_termino),
+      situacaoGestao: c.situacao_gestao,
+      motivoSituacao: c.motivo_situacao,
+      transferidoParaCodigo: c.transferido_para_codigo,
+      pendenteReativacao: c.pendente_confirmacao_reativacao,
     }));
 
     setContratos(linhas);

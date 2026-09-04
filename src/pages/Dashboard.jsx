@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { Clock, XCircle, TrendingDown, AlertTriangle } from "lucide-react";
-import ContratosTable from "../components/ContratosTable";
+import ClientesTable from "../components/ClientesTable";
 
 function KPICard({ icon: Icon, value, label, hint, tone, onClick }) {
   const tones = {
@@ -27,17 +27,20 @@ function KPICard({ icon: Icon, value, label, hint, tone, onClick }) {
 }
 
 export default function Dashboard({ contratos, onSelect, onNavigateFiltro }) {
+  // contratos encerrados/perdidos/transferidos não contam mais como pendência
+  const ativos = useMemo(() => contratos.filter((c) => !c.situacaoGestao), [contratos]);
+  const pendenciasReativacao = useMemo(() => contratos.filter((c) => c.pendenteReativacao).length, [contratos]);
+
   const stats = useMemo(() => {
-    const vencidos = contratos.filter((c) => c.dias < 0).length;
-    const d30 = contratos.filter((c) => c.dias >= 0 && c.dias <= 30).length;
-    const d95 = contratos.filter((c) => c.dias >= 0 && c.dias <= 95).length;
-    const d150 = contratos.filter((c) => c.dias >= 0 && c.dias <= 150).length;
-    const d180 = contratos.filter((c) => c.dias >= 0 && c.dias <= 180).length;
-    const pendenteConsultorUrgente = contratos.filter(
+    const vencidos = ativos.filter((c) => c.dias < 0).length;
+    const d95 = ativos.filter((c) => c.dias >= 0 && c.dias <= 95).length;
+    const d150 = ativos.filter((c) => c.dias >= 0 && c.dias <= 150).length;
+    const d180 = ativos.filter((c) => c.dias >= 0 && c.dias <= 180).length;
+    const pendenteConsultorUrgente = ativos.filter(
       (c) => c.dias >= 0 && c.dias <= 180 && c.consultor === "Pendente consultor"
     ).length;
-    return { total: contratos.length, vencidos, d30, d95, d150, d180, pendenteConsultorUrgente };
-  }, [contratos]);
+    return { total: contratos.length, vencidos, d95, d150, d180, pendenteConsultorUrgente };
+  }, [contratos, ativos]);
 
   const distVencimentos = useMemo(() => {
     const buckets = [
@@ -48,16 +51,16 @@ export default function Dashboard({ contratos, onSelect, onNavigateFiltro }) {
       { faixa: "151-180", lo: 151, hi: 180 },
       { faixa: "181-365", lo: 181, hi: 365 },
     ];
-    return buckets.map((b) => ({ faixa: b.faixa, qtd: contratos.filter((c) => c.dias >= b.lo && c.dias <= b.hi).length }));
-  }, [contratos]);
+    return buckets.map((b) => ({ faixa: b.faixa, qtd: ativos.filter((c) => c.dias >= b.lo && c.dias <= b.hi).length }));
+  }, [ativos]);
 
   const cargaConsultores = useMemo(() => {
     const map = {};
-    contratos.filter((c) => c.dias >= 0 && c.dias <= 180).forEach((c) => {
+    ativos.filter((c) => c.dias >= 0 && c.dias <= 180).forEach((c) => {
       map[c.consultor] = (map[c.consultor] || 0) + 1;
     });
     return Object.entries(map).map(([consultor, qtd]) => ({ consultor, qtd })).sort((a, b) => b.qtd - a.qtd).slice(0, 8);
-  }, [contratos]);
+  }, [ativos]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -65,6 +68,19 @@ export default function Dashboard({ contratos, onSelect, onNavigateFiltro }) {
         <h1 className="text-2xl font-semibold text-slate-50">Dashboard</h1>
         <p className="text-sm text-slate-500 mt-1">Base real: {stats.total.toLocaleString("pt-BR")} contratos no Supabase</p>
       </div>
+
+      {pendenciasReativacao > 0 && (
+        <button
+          onClick={() => onNavigateFiltro("pendentes")}
+          className="flex items-center gap-3 bg-sky-500/[0.06] hover:bg-sky-500/[0.1] border border-sky-500/20 rounded-xl px-4 sm:px-5 py-3 text-left transition-colors"
+        >
+          <AlertTriangle size={17} className="text-sky-400 shrink-0" />
+          <p className="text-sm text-sky-200">
+            <strong className="font-semibold">{pendenciasReativacao} contrato(s)</strong> voltaram a aparecer na
+            última planilha marcados como encerrado/perdido — precisam da sua confirmação.
+          </p>
+        </button>
+      )}
 
       {stats.d180 > 0 && stats.pendenteConsultorUrgente > 0 && (
         <button
@@ -86,12 +102,12 @@ export default function Dashboard({ contratos, onSelect, onNavigateFiltro }) {
         <KPICard icon={XCircle} tone="rose" value={stats.vencidos} label="Vencidos" hint="Ação imediata" onClick={() => onNavigateFiltro("vencidos")} />
       </div>
 
-      <ContratosTable contratos={contratos} onSelect={onSelect} porPagina={10} />
+      <ClientesTable contratos={contratos} onSelect={onSelect} porPagina={10} titulo="Clientes que precisam de ação" />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5">
           <h3 className="text-sm font-semibold text-slate-200 mb-1">Volume de vencimentos por faixa</h3>
-          <p className="text-xs text-slate-500 mb-4">Todos os {stats.total.toLocaleString("pt-BR")} contratos</p>
+          <p className="text-xs text-slate-500 mb-4">Contratos ativos (sem contar encerrados/perdidos/transferidos)</p>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={distVencimentos} margin={{ left: -20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />

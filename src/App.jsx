@@ -1,16 +1,15 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Menu, Loader2, ArrowLeft } from "lucide-react";
 import { useContratosData } from "./lib/useContratosData";
+import { useClientesRollup } from "./components/ClientesTable";
 import Sidebar from "./components/Sidebar";
 import ClienteDrawer from "./components/ClienteDrawer";
 import Dashboard from "./pages/Dashboard";
-import CentralRenovacoes from "./pages/CentralRenovacoes";
-import Contratos from "./pages/Contratos";
 import Clientes from "./pages/Clientes";
 import Consultores from "./pages/Consultores";
 import Importacoes from "./pages/Importacoes";
 
-const VIEWS_VALIDAS = ["dashboard", "central", "contratos", "clientes", "consultores", "importacoes"];
+const VIEWS_VALIDAS = ["dashboard", "clientes", "consultores", "importacoes"];
 
 function viewFromHash() {
   const h = window.location.hash.replace("#", "");
@@ -19,10 +18,16 @@ function viewFromHash() {
 
 export default function App() {
   const { loading, erro, contratos, consultores, refetch } = useContratosData();
+  const porCliente = useClientesRollup(contratos);
   const [view, setView] = useState(viewFromHash());
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [selecionado, setSelecionado] = useState(null);
-  const [filtroCentral, setFiltroCentral] = useState("todos");
+  const [codigoSelecionado, setCodigoSelecionado] = useState(null);
+  const [filtroClientes, setFiltroClientes] = useState("todos");
+
+  const clienteSelecionado = useMemo(
+    () => porCliente.find((c) => c.codigo === codigoSelecionado) || null,
+    [porCliente, codigoSelecionado]
+  );
 
   useEffect(() => {
     if (!window.location.hash) window.history.replaceState(null, "", "#dashboard");
@@ -40,8 +45,8 @@ export default function App() {
   }, []);
 
   function navegarComFiltro(filtro) {
-    setFiltroCentral(filtro);
-    navegar("central");
+    setFiltroClientes(filtro);
+    navegar("clientes");
   }
 
   function voltar() {
@@ -85,16 +90,14 @@ export default function App() {
         </div>
 
         <div className="px-4 sm:px-8 pb-10">
-          {view === "dashboard" && <Dashboard contratos={contratos} onSelect={setSelecionado} onNavigateFiltro={navegarComFiltro} />}
-          {view === "central" && <CentralRenovacoes contratos={contratos} onSelect={setSelecionado} filtroInicial={filtroCentral} />}
-          {view === "contratos" && <Contratos contratos={contratos} onSelect={setSelecionado} />}
-          {view === "clientes" && <Clientes contratos={contratos} onSelect={setSelecionado} />}
+          {view === "dashboard" && <Dashboard contratos={contratos} onSelect={setCodigoSelecionado} onNavigateFiltro={navegarComFiltro} />}
+          {view === "clientes" && <Clientes contratos={contratos} onSelect={setCodigoSelecionado} filtroInicial={filtroClientes} />}
           {view === "consultores" && <Consultores contratos={contratos} consultores={consultores} />}
           {view === "importacoes" && <Importacoes onImportado={refetch} />}
         </div>
       </main>
 
-      <ClienteDrawer cliente={selecionado} onClose={() => setSelecionado(null)} onAtualizado={refetch} />
+      <ClienteDrawer cliente={clienteSelecionado} onClose={() => setCodigoSelecionado(null)} onAtualizado={refetch} />
     </div>
   );
 }

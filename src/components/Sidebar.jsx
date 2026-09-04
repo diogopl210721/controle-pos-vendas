@@ -1,12 +1,10 @@
 import React from "react";
 import {
-  Flame, X, LayoutGrid, ListChecks, FileText, Users, Upload,
+  Flame, X, LayoutGrid, Users, Upload,
 } from "lucide-react";
 
 const ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutGrid },
-  { key: "central", label: "Central de Renovações", icon: ListChecks },
-  { key: "contratos", label: "Contratos", icon: FileText },
   { key: "clientes", label: "Clientes", icon: Users },
   { key: "consultores", label: "Consultores", icon: Users },
   { key: "importacoes", label: "Importações", icon: Upload },

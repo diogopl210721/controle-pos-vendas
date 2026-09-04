@@ -189,6 +189,28 @@ export default function Importacoes({ onImportado }) {
         if (error) throw error;
       }
 
+      // 4b) contratos que já estavam marcados como encerrado/perdido/transferido e voltaram a
+      // aparecer na planilha: não reativa sozinho, só sinaliza pra você confirmar
+      setProgresso("Verificando reativações pendentes...");
+      let pendenciasReativacao = 0;
+      const numerosDoImport = contratosRows.map((r) => r.numero_contrato);
+      for (const lote of chunk(numerosDoImport, 300)) {
+        const { data: fechados, error: erroFechados } = await supabase
+          .from("cpv_contratos")
+          .select("id")
+          .in("numero_contrato", lote)
+          .not("situacao_gestao", "is", null);
+        if (erroFechados) throw erroFechados;
+        if (fechados && fechados.length > 0) {
+          pendenciasReativacao += fechados.length;
+          const { error: erroFlag } = await supabase
+            .from("cpv_contratos")
+            .update({ pendente_confirmacao_reativacao: true })
+            .in("id", fechados.map((f) => f.id));
+          if (erroFlag) throw erroFlag;
+        }
+      }
+
       // 5) log da importação
       const mapeamentoLog = {};
       mapeamento.forEach((m) => {
@@ -211,6 +233,7 @@ export default function Importacoes({ onImportado }) {
         contratos: contratosRows.length,
         novosConsultores: novosConsultores.length,
         erros: erros.length,
+        pendenciasReativacao,
       });
       setEtapa("feito");
       if (onImportado) onImportado();
@@ -373,6 +396,15 @@ export default function Importacoes({ onImportado }) {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+          {resultado.pendenciasReativacao > 0 && (
+            <div className="bg-sky-500/10 border border-sky-500/20 rounded-lg p-3">
+              <p className="text-xs text-sky-300">
+                <strong className="font-semibold">{resultado.pendenciasReativacao} contrato(s)</strong> que estavam
+                marcados como encerrado/perdido/transferido voltaram a aparecer nessa planilha. Não mexi neles — vá
+                em Clientes → filtro "Pendências" pra confirmar um por um se reativa ou mantém encerrado.
+              </p>
             </div>
           )}
           <button onClick={reiniciar} className="self-start text-sm text-amber-400 hover:text-amber-300">
