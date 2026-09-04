@@ -107,9 +107,9 @@ export function normalizarLinhas(linhasBrutas, mapeamento) {
 
   linhasBrutas.forEach((linha, idx) => {
     const get = (key) => (porCampo[key] ? linha[porCampo[key]] : "");
-    const codigo_cliente = String(get("codigo_cliente") || "").trim();
+    const codigo_cliente = String(get("codigo_cliente") || "").trim().replace(/^0+(?=\d)/, "");
     const nome_cliente = String(get("nome_cliente") || "").trim();
-    const numero_contrato = String(get("numero_contrato") || "").trim();
+    const numero_contrato = String(get("numero_contrato") || "").trim().replace(/^0+(?=\d)/, "");
     const data_termino = parseData(get("data_termino"));
 
     if (!codigo_cliente || !nome_cliente || !numero_contrato || !data_termino) {
