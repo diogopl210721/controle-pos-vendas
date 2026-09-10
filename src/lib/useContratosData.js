@@ -38,7 +38,7 @@ export function useContratosData() {
         .select(`
           id, numero_contrato, data_inicio, data_termino, prazo_meses, canal_venda,
           situacao_gestao, motivo_situacao, transferido_para_codigo, pendente_confirmacao_reativacao,
-          cliente:cpv_clientes ( id, codigo_cliente, nome, bairro, cidade, uf, documento, endereco, telefone, whatsapp ),
+          cliente:cpv_clientes ( id, codigo_cliente, nome, bairro, cidade, uf, documento, endereco, telefone, whatsapp, tancagem_total_kg ),
           consultor:cpv_consultores ( id, nome )
         `)
         .order("data_termino", { ascending: true })
@@ -53,6 +53,41 @@ export function useContratosData() {
       if (!data || data.length < tamanhoPagina) break;
       de += tamanhoPagina;
     }
+
+    // consumo mensal (últimos 12 meses) — agregado por cliente
+    let todosConsumos = [];
+    de = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from("cpv_consumo_mensal")
+        .select("cliente_id, mes_referencia, consumo_kg")
+        .order("mes_referencia", { ascending: true })
+        .range(de, de + tamanhoPagina - 1);
+      if (error) break; // não trava o app se essa tabela tiver problema
+      todosConsumos = todosConsumos.concat(data || []);
+      if (!data || data.length < tamanhoPagina) break;
+      de += tamanhoPagina;
+    }
+    const consumoPorClienteId = {};
+    const dozeMesesAtras = new Date();
+    dozeMesesAtras.setMonth(dozeMesesAtras.getMonth() - 12);
+    todosConsumos.forEach((c) => {
+      if (!consumoPorClienteId[c.cliente_id]) consumoPorClienteId[c.cliente_id] = [];
+      consumoPorClienteId[c.cliente_id].push(c);
+    });
+    const resumoConsumoPorClienteId = {};
+    Object.entries(consumoPorClienteId).forEach(([clienteId, lista]) => {
+      const ultimos12 = lista.filter((c) => new Date(c.mes_referencia) >= dozeMesesAtras);
+      const volume12m = ultimos12.reduce((s, c) => s + Number(c.consumo_kg), 0);
+      const media = ultimos12.length ? volume12m / ultimos12.length : null;
+      const ultimo = lista[lista.length - 1];
+      resumoConsumoPorClienteId[clienteId] = {
+        historico: lista,
+        volume12m: ultimos12.length ? volume12m : null,
+        mediaMensal: media,
+        ultimoMes: ultimo ? Number(ultimo.consumo_kg) : null,
+      };
+    });
 
     const linhas = todasAsLinhas.map((c) => ({
       id: c.id,
@@ -78,6 +113,8 @@ export function useContratosData() {
       motivoSituacao: c.motivo_situacao,
       transferidoParaCodigo: c.transferido_para_codigo,
       pendenteReativacao: c.pendente_confirmacao_reativacao,
+      tancagemTotalKg: c.cliente?.tancagem_total_kg ?? null,
+      consumo: resumoConsumoPorClienteId[c.cliente?.id] || null,
     }));
 
     setContratos(linhas);

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Search, ChevronRight, AlertTriangle } from "lucide-react";
+import { Search, ChevronRight, AlertTriangle, MapPin, MessageCircle } from "lucide-react";
 import { prioridade, formatDate } from "../lib/format";
 
 const FILTROS = [
@@ -10,8 +10,18 @@ const FILTROS = [
   { key: "95", label: "95 dias" },
   { key: "150", label: "150 dias" },
   { key: "180", label: "180 dias" },
-  { key: "fechados", label: "Encerrados/Perdidos" },
+  { key: "fechados", label: "Encerrados/Perdidos/Renovados" },
 ];
+
+function soDigitos(str) {
+  return String(str || "").replace(/\D/g, "");
+}
+function linkWhatsapp(numero) {
+  let d = soDigitos(numero);
+  if (!d) return null;
+  if (d.length <= 11) d = "55" + d;
+  return `https://wa.me/${d}`;
+}
 
 export function useClientesRollup(contratos) {
   return useMemo(() => {
@@ -30,6 +40,8 @@ export function useClientesRollup(contratos) {
           telefone: c.telefone,
           whatsapp: c.whatsapp,
           consultor: c.consultor,
+          tancagemTotalKg: c.tancagemTotalKg,
+          consumo: c.consumo,
           contratos: [],
         };
       }
@@ -144,16 +156,17 @@ export default function ClientesTable({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[760px]">
+        <table className="w-full text-sm min-w-[920px]">
           <thead>
             <tr className="text-left text-slate-500 text-xs border-y border-slate-800">
               <th className="font-medium py-2.5 px-4 sm:px-5">Status</th>
               <th className="font-medium py-2.5 px-3">Código</th>
               <th className="font-medium py-2.5 px-3">Cliente</th>
-              <th className="font-medium py-2.5 px-3">Cidade</th>
+              <th className="font-medium py-2.5 px-3">Tancagem</th>
+              <th className="font-medium py-2.5 px-3">Consumo méd.</th>
               <th className="font-medium py-2.5 px-3">Consultor</th>
-              <th className="font-medium py-2.5 px-3">Contratos</th>
               <th className="font-medium py-2.5 px-3">Próx. vencimento</th>
+              <th className="font-medium py-2.5 px-3">Ações</th>
               <th className="font-medium py-2.5 px-4 sm:px-5"></th>
             </tr>
           </thead>
@@ -161,6 +174,8 @@ export default function ClientesTable({
             {pageItems.map((c) => {
               const badge = c.maisUrgente ? prioridade(c.maisUrgente.dias) : { label: "Sem contrato ativo", cls: "bg-slate-500/15 text-slate-400 border-slate-500/30" };
               const pendente = c.consultor === "Pendente consultor";
+              const wa = linkWhatsapp(c.whatsapp || c.telefone);
+              const enderecoBusca = c.endereco ? `${c.endereco}, ${c.cidade}` : `${c.nome} ${c.cidade}`;
               return (
                 <tr
                   key={c.codigo}
@@ -176,11 +191,29 @@ export default function ClientesTable({
                     )}
                   </td>
                   <td className="py-2.5 px-3 text-slate-400 tabular-nums">{c.codigo}</td>
-                  <td className="py-2.5 px-3 text-slate-100 max-w-[220px] truncate">{c.nome}</td>
-                  <td className="py-2.5 px-3 text-slate-400">{c.cidade}</td>
+                  <td className="py-2.5 px-3 text-slate-100 max-w-[200px] truncate">{c.nome}</td>
+                  <td className="py-2.5 px-3 text-slate-400 tabular-nums">{c.tancagemTotalKg ? `${c.tancagemTotalKg} kg` : "—"}</td>
+                  <td className="py-2.5 px-3 text-slate-400 tabular-nums">{c.consumo?.mediaMensal ? `${Math.round(c.consumo.mediaMensal)} kg` : "—"}</td>
                   <td className={`py-2.5 px-3 ${pendente ? "text-amber-400" : "text-slate-400"}`}>{c.consultor}</td>
-                  <td className="py-2.5 px-3 text-slate-400 tabular-nums">{c.qtdContratos}</td>
                   <td className="py-2.5 px-3 text-slate-400 tabular-nums">{c.maisUrgente ? formatDate(c.maisUrgente.venc) : "—"}</td>
+                  <td className="py-2.5 px-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1.5">
+                      {wa ? (
+                        <a href={wa} target="_blank" rel="noreferrer" className="w-6 h-6 rounded-md bg-emerald-500/15 text-emerald-400 flex items-center justify-center hover:bg-emerald-500/25">
+                          <MessageCircle size={12} />
+                        </a>
+                      ) : (
+                        <span className="w-6 h-6 rounded-md bg-slate-800 text-slate-600 flex items-center justify-center"><MessageCircle size={12} /></span>
+                      )}
+                      <a
+                        href={`https://www.google.com/maps/search/${encodeURIComponent(enderecoBusca)}`}
+                        target="_blank" rel="noreferrer"
+                        className="w-6 h-6 rounded-md bg-teal-500/15 text-teal-400 flex items-center justify-center hover:bg-teal-500/25"
+                      >
+                        <MapPin size={12} />
+                      </a>
+                    </div>
+                  </td>
                   <td className="py-2.5 px-4 sm:px-5 text-right">
                     <ChevronRight size={15} className="text-slate-600" />
                   </td>

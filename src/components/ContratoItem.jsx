@@ -6,12 +6,14 @@ import DossieIA from "./DossieIA";
 
 const OPCOES_STATUS = [
   { value: "", label: "Ativo (em acompanhamento normal)" },
+  { value: "renovado", label: "Renovado" },
   { value: "encerrado", label: "Encerrado" },
   { value: "perdido", label: "Perdido" },
   { value: "transferido", label: "Transferido para outro código" },
 ];
 
 function badgeSituacao(contrato) {
+  if (contrato.situacaoGestao === "renovado") return { label: "Renovado", cls: "bg-teal-500/15 text-teal-300 border-teal-500/30" };
   if (contrato.situacaoGestao === "encerrado") return { label: "Encerrado", cls: "bg-slate-500/15 text-slate-400 border-slate-500/30" };
   if (contrato.situacaoGestao === "perdido") return { label: "Perdido", cls: "bg-rose-500/15 text-rose-300 border-rose-500/30" };
   if (contrato.situacaoGestao === "transferido") return { label: "Transferido", cls: "bg-sky-500/15 text-sky-300 border-sky-500/30" };
@@ -55,6 +57,18 @@ export default function ContratoItem({ contrato, onAtualizado }) {
       : { pendente_confirmacao_reativacao: false };
     const { error } = await supabase.from("cpv_contratos").update(payload).eq("id", contrato.id);
     setRespondendoPendencia(false);
+    if (!error) onAtualizado && onAtualizado();
+  }
+
+  async function arquivarRapido() {
+    setSalvando(true);
+    const { error } = await supabase.from("cpv_contratos").update({
+      situacao_gestao: "encerrado",
+      motivo_situacao: contrato.motivoSituacao || "Arquivado rapidamente",
+      situacao_atualizada_em: new Date().toISOString(),
+      pendente_confirmacao_reativacao: false,
+    }).eq("id", contrato.id);
+    setSalvando(false);
     if (!error) onAtualizado && onAtualizado();
   }
 
@@ -111,9 +125,16 @@ export default function ContratoItem({ contrato, onAtualizado }) {
           </div>
 
           {!editandoStatus ? (
-            <button onClick={() => setEditandoStatus(true)} className="text-xs text-amber-400 hover:text-amber-300 text-left">
-              Alterar status deste contrato
-            </button>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setEditandoStatus(true)} className="text-xs text-amber-400 hover:text-amber-300 text-left">
+                Alterar status deste contrato
+              </button>
+              {!contrato.situacaoGestao && (
+                <button onClick={arquivarRapido} disabled={salvando} className="text-xs text-slate-500 hover:text-slate-300 text-left">
+                  Arquivar rápido
+                </button>
+              )}
+            </div>
           ) : (
             <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex flex-col gap-2">
               <select
